@@ -55,7 +55,7 @@ class WebApp(Settings, DownloadManager):
         self.add_to_queue(item_info)
 
     def run_app(self):
-        self.socketio.run(self.app, host="0.0.0.0", port=5000)
+        self.socketio.run(self.app, host="0.0.0.0", port=8500)
 
     def get_app(self):
         return self.app

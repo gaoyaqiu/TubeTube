@@ -5,9 +5,28 @@ import logging
 import platform
 import threading
 import random
+import shutil
+import yaml
 import yt_dlp
 from settings import DownloadCancelledException
 import helpers
+
+
+DEFAULT_APP_CONFIG = {
+    "VERBOSE_LOGS": False,
+    "TRIM_METADATA": False,
+    "PROXY": "",
+    "PREFERRED_LANGUAGE": "en",
+    "PREFERRED_AUDIO_CODEC": "aac",
+    "PREFERRED_VIDEO_CODEC": "vp9",
+    "PREFERRED_VIDEO_EXT": "mp4",
+    "EMBED_SUBS": False,
+    "WRITE_SUBS": False,
+    "ALLOW_AUTO_SUBS": True,
+    "SUBTITLE_FORMAT": "vtt",
+    "SUBTITLE_LANGUAGES": "en",
+    "THREAD_COUNT": 4,
+}
 
 
 class DownloadManager:
@@ -20,41 +39,52 @@ class DownloadManager:
         os_system = platform.system()
         logging.info(f"OS: {os_system}")
 
-        self.ffmpeg_location = "D:\\" if os_system == "Windows" else "/usr/bin/ffmpeg"
+        self.ffmpeg_location = self._resolve_ffmpeg_path(os_system)
         logging.info(f"FFmpeg location set to: {self.ffmpeg_location}")
 
-        self.verbose_ytdlp = bool(os.getenv("VERBOSE_LOGS", "False").lower() == "true")
+        self.app_config_path = self._resolve_app_config_path()
+        self.app_config = self._load_app_config(self.app_config_path)
+
+        self.verbose_ytdlp = self._get_bool("VERBOSE_LOGS", False)
         logging.info(f"Verbose logging for yt-dlp set to: {self.verbose_ytdlp}")
 
-        self.trim_metadata = bool(os.getenv("TRIM_METADATA", "False").lower() == "true")
+        self.trim_metadata = self._get_bool("TRIM_METADATA", False)
         logging.info(f"Trim Metadata set to: {self.trim_metadata}")
 
-        self.preferred_language = os.getenv("PREFERRED_LANGUAGE", "en")
+        proxy_value = self._get_str("PROXY", "")
+        self.proxy = proxy_value.strip() if isinstance(proxy_value, str) else ""
+        self.proxy = self.proxy or None
+        if self.proxy:
+            logging.info("Proxy enabled for yt-dlp requests.")
+        else:
+            logging.info("Proxy disabled for yt-dlp requests.")
+
+        self.preferred_language = self._get_str("PREFERRED_LANGUAGE", "en")
         logging.info(f"Preferred Audio Language: {self.preferred_language}")
 
-        self.preferred_audio_codec = os.getenv("PREFERRED_AUDIO_CODEC", "aac")
+        self.preferred_audio_codec = self._get_str("PREFERRED_AUDIO_CODEC", "aac")
         logging.info(f"Preferred Audio Codec: {self.preferred_audio_codec}")
 
-        self.preferred_video_codec = os.getenv("PREFERRED_VIDEO_CODEC", "vp9")
+        self.preferred_video_codec = self._get_str("PREFERRED_VIDEO_CODEC", "vp9")
         logging.info(f"Preferred Video Codec: {self.preferred_video_codec}")
 
-        self.preferred_video_ext = os.getenv("PREFERRED_VIDEO_EXT", "mp4")
+        self.preferred_video_ext = self._get_str("PREFERRED_VIDEO_EXT", "mp4")
         logging.info(f"Preferred Video Ext: {self.preferred_video_ext}")
 
-        self.embed_subs = bool(os.getenv("EMBED_SUBS", "False").lower() == "true")
+        self.embed_subs = self._get_bool("EMBED_SUBS", False)
         logging.info(f"Embed Subtitles: {self.embed_subs}")
 
-        self.write_subs = bool(os.getenv("WRITE_SUBS", "False").lower() == "true")
+        self.write_subs = self._get_bool("WRITE_SUBS", False)
         logging.info(f"Write Subtitles: {self.write_subs}")
 
-        self.allow_auto_subs = bool(os.getenv("ALLOW_AUTO_SUBS", "True").lower() == "true")
+        self.allow_auto_subs = self._get_bool("ALLOW_AUTO_SUBS", True)
         logging.info(f"Automatic Subtitles Enabled: {self.allow_auto_subs}")
 
-        self.subtitle_format = os.getenv("SUBTITLE_FORMAT", "vtt")
+        self.subtitle_format = self._get_str("SUBTITLE_FORMAT", "vtt")
         logging.info(f"Subtitle Format: {self.subtitle_format}")
 
-        subtitle_langs_env = os.getenv("SUBTITLE_LANGUAGES", "en")
-        self.subtitle_languages = [lang.strip() for lang in subtitle_langs_env.split(",") if lang.strip()]
+        subtitle_langs_raw = self._get_config_value("SUBTITLE_LANGUAGES", "en")
+        self.subtitle_languages = self._parse_languages(subtitle_langs_raw)
         logging.info(f"Subtitle Languages: {self.subtitle_languages}")
 
         self.subtitle_config = {
@@ -69,7 +99,7 @@ class DownloadManager:
         if self.embed_subs:
             self.subtitle_pps.append({"key": "FFmpegEmbedSubtitle", "already_have_subtitle": self.write_subs})
 
-        self.thread_count = int(os.getenv("THREAD_COUNT", "4"))
+        self.thread_count = self._get_int("THREAD_COUNT", 4)
         logging.info(f"Thread Count: {self.thread_count}")
 
         for i in range(self.thread_count):
@@ -77,19 +107,24 @@ class DownloadManager:
             worker.start()
             logging.info(f"Started thread: {worker.name}")
 
+        temp_env = os.getenv("TUBETUBE_TEMP_DIR")
+        self.temp_folder = temp_env if temp_env else os.path.expanduser("~/.tubetube/temp")
+        os.makedirs(self.temp_folder, exist_ok=True)
+
         parsing_opts = {
             "quiet": True,
             "no_color": True,
             "extract_flat": True,
             "ignore_no_formats_error": True,
             "force_generic_extractor": False,
-            "cachedir": "/temp/cache",
+            "cachedir": os.path.join(self.temp_folder, "cache"),
             "noprogress": True,
             "no_warnings": True,
         }
+        if self.proxy:
+            parsing_opts["proxy"] = self.proxy
         self.ydl_for_parsing = yt_dlp.YoutubeDL(parsing_opts)
 
-        self.temp_folder = "/temp"
         self.cleanup_temp_folder()
 
     def cleanup_temp_folder(self):
@@ -103,6 +138,120 @@ class DownloadManager:
 
         except Exception as e:
             logging.error(f"Error cleaning up temporary folder: {e}")
+
+    def _resolve_ffmpeg_path(self, os_system):
+        path = shutil.which("ffmpeg")
+        if path:
+            return path
+
+        if os_system == "Windows":
+            candidates = [
+                r"C:\ffmpeg\bin\ffmpeg.exe",
+                r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+                r"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
+                r"D:\ffmpeg\bin\ffmpeg.exe",
+            ]
+        elif os_system == "Darwin":
+            candidates = [
+                "/opt/homebrew/bin/ffmpeg",
+                "/usr/local/bin/ffmpeg",
+                "/usr/bin/ffmpeg",
+            ]
+        else:
+            candidates = [
+                "/usr/bin/ffmpeg",
+                "/usr/local/bin/ffmpeg",
+            ]
+
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+
+        return "ffmpeg"
+
+    def _resolve_app_config_path(self):
+        config_path = os.getenv("TUBETUBE_APP_CONFIG")
+        if config_path:
+            return config_path
+        config_folder = getattr(self, "config_folder", None)
+        if config_folder:
+            return os.path.join(config_folder, "app_config.yaml")
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return os.path.join(repo_root, "config", "app_config.yaml")
+
+    def _load_app_config(self, config_path):
+        if not config_path:
+            return DEFAULT_APP_CONFIG.copy()
+        config_dir = os.path.dirname(config_path)
+        if config_dir:
+            os.makedirs(config_dir, exist_ok=True)
+        if not os.path.exists(config_path):
+            try:
+                with open(config_path, "w") as file:
+                    yaml.safe_dump(DEFAULT_APP_CONFIG, file, default_flow_style=False)
+            except OSError as e:
+                logging.error(f"Unable to write app config: {e}")
+            return DEFAULT_APP_CONFIG.copy()
+
+        try:
+            with open(config_path, "r") as file:
+                return yaml.safe_load(file) or DEFAULT_APP_CONFIG.copy()
+        except (OSError, yaml.YAMLError) as e:
+            logging.error(f"App config loading error: {e}")
+            return DEFAULT_APP_CONFIG.copy()
+
+    def _get_config_value(self, env_key, default):
+        env_value = os.getenv(env_key)
+        if env_value is not None:
+            return env_value
+        if not isinstance(self.app_config, dict):
+            return default
+        if env_key in self.app_config:
+            return self.app_config.get(env_key)
+        lower_key = env_key.lower()
+        if lower_key in self.app_config:
+            return self.app_config.get(lower_key)
+        return default
+
+    def _parse_bool(self, value, default=False):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        value_str = str(value).strip().lower()
+        if not value_str:
+            return default
+        if value_str in {"1", "true", "yes", "on"}:
+            return True
+        if value_str in {"0", "false", "no", "off"}:
+            return False
+        return default
+
+    def _get_bool(self, env_key, default):
+        return self._parse_bool(self._get_config_value(env_key, default), default)
+
+    def _get_int(self, env_key, default):
+        raw_value = self._get_config_value(env_key, default)
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError):
+            return default
+
+    def _get_str(self, env_key, default):
+        raw_value = self._get_config_value(env_key, default)
+        if raw_value is None:
+            return default
+        return str(raw_value)
+
+    def _parse_languages(self, raw_languages):
+        if isinstance(raw_languages, (list, tuple, set)):
+            values = raw_languages
+        else:
+            values = str(raw_languages or "").split(",")
+        languages = [str(lang).strip() for lang in values if str(lang).strip()]
+        return languages if languages else ["en"]
 
     def add_to_queue(self, item_info):
         url = item_info.get("url", "")
@@ -206,7 +355,7 @@ class DownloadManager:
             download_format = f"{video_format_id}+{audio_format_id}/bestvideo+bestaudio/best"
 
         item_title = re.sub(r'[<>:"/\\|?*]', "-", item.get("title"))
-        final_path = f"/data/{folder_name}"
+        final_path = os.path.join(getattr(self, "data_folder", "/data"), folder_name)
 
         ydl_opts = {
             "ignore_no_formats_error": True,
@@ -227,6 +376,8 @@ class DownloadManager:
             "no_mtime": True,
             "format_sort": [f"lang:{self.preferred_language}", f"acodec:{self.preferred_audio_codec}", "quality", "size", f"vcodec:{self.preferred_video_codec}", f"vext:{self.preferred_video_ext}"],
         }
+        if self.proxy:
+            ydl_opts["proxy"] = self.proxy
 
         post_processors = [
             {"key": "SponsorBlock", "categories": ["sponsor"]},
