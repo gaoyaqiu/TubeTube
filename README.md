@@ -84,21 +84,24 @@ Customize the behavior of **TubeTube** by setting the following environment vari
 
 ```yaml
 environment:
-  - PUID=1000                       # User ID for permissions (default: 1000)
-  - PGID=1000                       # Group ID for permissions (default: 1000)
-  - VERBOSE_LOGS=false              # Enable verbose logging for yt-dlp (default: false)
-  - TRIM_METADATA=false             # Trim metadata from files (default: false)
-  - PREFERRED_LANGUAGE=en           # Desired audio language for downloads (default: en)
-  - PREFERRED_AUDIO_CODEC=aac       # Desired audio codec (default: aac)
-  - PREFERRED_VIDEO_CODEC=vp9       # Desired video codec (default: vp9)
-  - PREFERRED_VIDEO_EXT=mp4         # Desired video file extension (default: mp4)
-  - EMBED_SUBS=false                # Embed subtitles in the video (default: false)
-  - WRITE_SUBS=false                # Write subtitles as separate files (default: false)
-  - ALLOW_AUTO_SUBS=false           # Allow automatically generated subtitles as a fallback (default: true)
-  - SUBTITLE_FORMAT=vtt             # Format of the subtitles (default: vtt)
-  - SUBTITLE_LANGUAGES=en           # Subtitle language (default: en)
-  - THREAD_COUNT=4                  # Number of threads for processing (default: 4)
+  - PUID=1000                       # 用户ID（默认: 1000）
+  - PGID=1000                       # 用户组ID（默认: 1000）
+  - VERBOSE_LOGS=false              # 启用 yt-dlp 详细日志（默认: false）
+  - TRIM_METADATA=false             # 修剪文件元数据（默认: false）
+  - PROXY=http://127.0.0.1:7897     # 代理地址（可选）
+  - PREFERRED_LANGUAGE=en           # 下载音频的首选语言（默认: en）
+  - PREFERRED_AUDIO_CODEC=aac       # 首选音频编码（默认: aac）
+  - PREFERRED_VIDEO_CODEC=vp9       # 首选视频编码（默认: vp9）
+  - PREFERRED_VIDEO_EXT=mp4         # 首选视频扩展名（默认: mp4）
+  - EMBED_SUBS=false                # 将字幕内嵌到视频中（默认: false）
+  - WRITE_SUBS=false                # 将字幕保存为独立文件（默认: false）
+  - ALLOW_AUTO_SUBS=false           # 允许自动生成字幕作为兜底（默认: true）
+  - SUBTITLE_FORMAT=vtt             # 字幕格式（默认: vtt）
+  - SUBTITLE_LANGUAGES=en           # 字幕语言（默认: en）
+  - THREAD_COUNT=4                  # 处理线程数量（默认: 4）
 ```
+
+本地开发可使用 `config/app_config.yaml` 配置；如存在环境变量则优先生效。
 
 ## Screenshots
 
