@@ -1,5 +1,7 @@
 import os
 import logging
+import sys
+
 import yaml
 
 
@@ -20,7 +22,28 @@ class Config:
 
 class Settings:
     def __init__(self):
-        self.config_folder = "/config"
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        config_env = os.getenv("TUBETUBE_CONFIG_DIR")
+        if config_env:
+            self.config_folder = config_env
+        else:
+            default_config_folder = "/config"
+            if os.path.isdir(default_config_folder) and os.access(default_config_folder, os.W_OK):
+                self.config_folder = default_config_folder
+            else:
+                self.config_folder = os.path.join(repo_root, "config")
+
+        data_env = os.getenv("TUBETUBE_DATA_DIR")
+        if data_env:
+            self.data_folder = data_env
+        else:
+            default_data_folder = "/data"
+            if os.path.isdir(default_data_folder) and os.access(default_data_folder, os.W_OK):
+                self.data_folder = default_data_folder
+            else:
+                self.data_folder = os.path.join(repo_root, "data")
+
         self.settings_file_path = os.path.join(self.config_folder, "settings.yaml")
 
         self.folder_locations = self._load_settings()
@@ -29,7 +52,7 @@ class Settings:
         all_folders = set(self.audio_locations.keys()).union(set(self.video_locations.keys()))
 
         for folder_name in all_folders:
-            os.makedirs(os.path.join("/data", folder_name), exist_ok=True)
+            os.makedirs(os.path.join(self.data_folder, folder_name), exist_ok=True)
 
         os.makedirs(self.config_folder, exist_ok=True)
 
