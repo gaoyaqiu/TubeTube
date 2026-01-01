@@ -16,15 +16,16 @@ DEFAULT_APP_CONFIG = {
     "VERBOSE_LOGS": False,
     "TRIM_METADATA": False,
     "PROXY": "",
-    "PREFERRED_LANGUAGE": "en",
+    "JS_RUNTIMES": "",
+    "PREFERRED_LANGUAGE": "zh-Hant",
     "PREFERRED_AUDIO_CODEC": "aac",
     "PREFERRED_VIDEO_CODEC": "vp9",
     "PREFERRED_VIDEO_EXT": "mp4",
     "EMBED_SUBS": False,
-    "WRITE_SUBS": False,
+    "WRITE_SUBS": True,
     "ALLOW_AUTO_SUBS": True,
     "SUBTITLE_FORMAT": "vtt",
-    "SUBTITLE_LANGUAGES": "en",
+    "SUBTITLE_LANGUAGES": "zh-Hant",
     "THREAD_COUNT": 4,
 }
 
@@ -58,6 +59,14 @@ class DownloadManager:
             logging.info("Proxy enabled for yt-dlp requests.")
         else:
             logging.info("Proxy disabled for yt-dlp requests.")
+
+        self.js_runtimes = self._parse_js_runtimes(self._get_config_value("JS_RUNTIMES", ""))
+        if not self.js_runtimes:
+            self.js_runtimes = self._auto_detect_js_runtimes()
+        if self.js_runtimes:
+            logging.info(f"JS runtimes for yt-dlp: {self.js_runtimes}")
+        else:
+            logging.info("No JS runtime configured for yt-dlp.")
 
         self.preferred_language = self._get_str("PREFERRED_LANGUAGE", "en")
         logging.info(f"Preferred Audio Language: {self.preferred_language}")
@@ -123,6 +132,8 @@ class DownloadManager:
         }
         if self.proxy:
             parsing_opts["proxy"] = self.proxy
+        if self.js_runtimes:
+            parsing_opts["js_runtimes"] = self.js_runtimes
         self.ydl_for_parsing = yt_dlp.YoutubeDL(parsing_opts)
 
         self.cleanup_temp_folder()
@@ -253,6 +264,52 @@ class DownloadManager:
         languages = [str(lang).strip() for lang in values if str(lang).strip()]
         return languages if languages else ["en"]
 
+    def _parse_js_runtimes(self, raw_runtimes):
+        if raw_runtimes is None:
+            return {}
+        if isinstance(raw_runtimes, dict):
+            normalized = {}
+            for runtime, config in raw_runtimes.items():
+                runtime_name = str(runtime).strip().lower()
+                if not runtime_name:
+                    continue
+                normalized[runtime_name] = config if isinstance(config, dict) else {}
+            return normalized
+        if isinstance(raw_runtimes, (list, tuple, set)):
+            values = raw_runtimes
+        else:
+            values = str(raw_runtimes or "").split(",")
+        runtimes = {}
+        for value in values:
+            value_str = str(value).strip()
+            if not value_str:
+                continue
+            runtime, path = (value_str.split(":", 1) + [None])[:2]
+            runtime_name = runtime.strip().lower()
+            if not runtime_name:
+                continue
+            config = {}
+            if path:
+                path = path.strip()
+                if path:
+                    config["path"] = path
+            runtimes[runtime_name] = config
+        return runtimes
+
+    def _auto_detect_js_runtimes(self):
+        candidates = {
+            "deno": "deno",
+            "node": "node",
+            "bun": "bun",
+            "quickjs": "qjs",
+        }
+        runtimes = {}
+        for runtime, binary in candidates.items():
+            path = shutil.which(binary)
+            if path:
+                runtimes[runtime] = {"path": path}
+        return runtimes
+
     def add_to_queue(self, item_info):
         url = item_info.get("url", "")
         logging.info(f"Processing URL: {url}")
@@ -378,6 +435,8 @@ class DownloadManager:
         }
         if self.proxy:
             ydl_opts["proxy"] = self.proxy
+        if self.js_runtimes:
+            ydl_opts["js_runtimes"] = self.js_runtimes
 
         post_processors = [
             {"key": "SponsorBlock", "categories": ["sponsor"]},
