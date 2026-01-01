@@ -89,6 +89,7 @@ environment:
   - VERBOSE_LOGS=false              # 启用 yt-dlp 详细日志（默认: false）
   - TRIM_METADATA=false             # 修剪文件元数据（默认: false）
   - PROXY=http://127.0.0.1:7897     # 代理地址（可选）
+  - JS_RUNTIMES=node,deno           # JS 运行时列表（默认: 自动检测）
   - PREFERRED_LANGUAGE=en           # 下载音频的首选语言（默认: en）
   - PREFERRED_AUDIO_CODEC=aac       # 首选音频编码（默认: aac）
   - PREFERRED_VIDEO_CODEC=vp9       # 首选视频编码（默认: vp9）
@@ -100,6 +101,7 @@ environment:
   - SUBTITLE_LANGUAGES=en           # 字幕语言（默认: en）
   - THREAD_COUNT=4                  # 处理线程数量（默认: 4）
 ```
+> 注： yt‑dlp 对 Node 的最低支持是 v20
 
 本地开发可使用 `config/app_config.yaml` 配置；如存在环境变量则优先生效。
 
