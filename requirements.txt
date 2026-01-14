@@ -5,3 +5,4 @@ flask==3.1.2
 flask_socketio==5.6.0
 yt_dlp[default]==2026.02.04
 pyyaml==6.0.3
+opencc-python-reimplemented
