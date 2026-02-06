@@ -61,6 +61,7 @@ Video:
   video_format_id: '625'
 
 ```
+视频支持哪些分辨率，通过 yt-dlp --cookies /cookies.txt --js-runtimes node -F <url> 查看
 
 
 ### Notes:
@@ -127,3 +128,13 @@ environment:
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=mattblackonly/tubetube&type=Date" />
  </picture>
 </a>
+
+
+## 注意事项
+
+下载最好携带 cookie，一个视频对应一个 cookie，当遇到如下错误提示，需要重试即可（前提是该视频的cookie没有下载成功过，一旦下载过视频就需要更换新的cookie）
+
+```bash
+[download] Got error: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac (_ssl.c:2580)
+[download] Got error: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac (_ssl.c:2580)
+```

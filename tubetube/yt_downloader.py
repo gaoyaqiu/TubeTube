@@ -491,11 +491,13 @@ class DownloadManager:
             raise DownloadCancelledException("Cancelled")
 
         if d["status"] == "downloading":
-            if random.randint(1, 10) != 1:
-                return
-
             with self.lock:
                 item = self.all_items[download_id]
+                self._log_video_format_if_needed(item, d)
+
+                if random.randint(1, 10) != 1:
+                    return
+
                 live = d.get("info_dict", {}).get("is_live", False)
                 if live:
                     fragment_index_str = d.get("fragment_index", 1)
@@ -517,6 +519,46 @@ class DownloadManager:
                 item["status"] = "Processing"
                 logging.info(f'Download finished: {item.get("title")} - processing now')
                 self.socketio.emit("update_download_item", {"item": item})
+
+    def _log_video_format_if_needed(self, item, d):
+        if item.get("video_format_logged"):
+            return
+
+        info = d.get("info_dict") or {}
+        height = info.get("height")
+        width = info.get("width")
+        vcodec = info.get("vcodec")
+
+        is_video_stream = bool(height or (vcodec and vcodec != "none"))
+        if not is_video_stream:
+            return
+
+        parts = []
+        format_id = info.get("format_id")
+        if format_id:
+            parts.append(f"id={format_id}")
+        format_note = info.get("format_note")
+        if format_note:
+            parts.append(f"note={format_note}")
+        if width and height:
+            parts.append(f"{width}x{height}")
+        elif height:
+            parts.append(f"{height}p")
+        fps = info.get("fps")
+        if fps:
+            parts.append(f"{fps}fps")
+        ext = info.get("ext")
+        if ext:
+            parts.append(ext)
+        if vcodec and vcodec != "none":
+            parts.append(f"vcodec={vcodec}")
+        acodec = info.get("acodec")
+        if acodec and acodec != "none":
+            parts.append(f"acodec={acodec}")
+
+        summary = " ".join(parts) if parts else "unknown format"
+        logging.info(f'Download video format: {summary} | title="{item.get("title")}"')
+        item["video_format_logged"] = True
 
     def cancel_items(self, item_ids):
         with self.lock:
