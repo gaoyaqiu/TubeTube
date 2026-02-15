@@ -61,7 +61,6 @@ Video:
   video_format_id: '625'
 
 ```
-视频支持哪些分辨率，通过 yt-dlp --cookies /cookies.txt --js-runtimes node -F <url> 查看
 
 
 ### Notes:
@@ -137,4 +136,23 @@ environment:
 ```bash
 [download] Got error: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac (_ssl.c:2580)
 [download] Got error: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac (_ssl.c:2580)
+```
+
+## 常用命令
+
+```bash
+
+# 查看分辨率
+yt-dlp --cookies ./cookies.txt --js-runtimes node -F <url>
+
+# 查看字幕
+yt-dlp --cookies ./cookies.txt --list-subs <url>
+
+# 只下载字幕
+yt-dlp --cookies ./cookies.txt \
+		   --js-runtimes node \
+	     --skip-download \
+       --write-subs \
+       --sub-langs zh-TW \
+       --sub-format srt <url>
 ```
